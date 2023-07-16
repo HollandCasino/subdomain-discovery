@@ -1,9 +1,13 @@
-import asyncio
-import httpx
+import requests
 from bs4 import BeautifulSoup
+import httpx
+
+# https://github.com/HollandCasino
+# This script uses https://crt.sh/ to uncover both active and expired subdomains.
+# The status_code "-1" represent an error. 
 
 def fetch_html_content(url):
-    response = httpx.get(url)
+    response = requests.get(url)
     return response.text
 
 def find_matching_domains(td_texts, domain):
@@ -14,25 +18,28 @@ def find_matching_domains(td_texts, domain):
     return printed_strings
 
 def prepare_urls(printed_strings):
-    urls = ["http://" + td_text for td_text in printed_strings] + ["https://" + td_text for td_text in printed_strings]
+    urls = []
+    for td_text in printed_strings:
+        urls.append("http://" + td_text)
+        urls.append("https://" + td_text)
     return urls
 
-async def check_status_code(url):
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(url, timeout=1)
-            return url, response.status_code
-        except httpx.RequestError:
-            return url, -1
 
-async def check_status_codes(urls):
-    tasks = [check_status_code(url) for url in urls]
-    return await asyncio.gather(*tasks)
+def check_status_codes(urls):
+    status_codes = []
+    for sc_check in urls:
+        try:
+            check = httpx.get(sc_check, timeout=1)
+            status_codes.append((sc_check, check.status_code))
+        except httpx.RequestError as e:
+            status_codes.append((sc_check, -1))  
+    return status_codes
 
 def print_sorted_status_codes(status_codes):
     status_codes.sort(key=lambda x: x[1])
     for sc_check, status_code in status_codes:
         print(f"{sc_check}: {status_code}")
+
 
 def main():
     domain = input("What is the domain? Example: google.nl  :   ")
@@ -44,9 +51,7 @@ def main():
 
     printed_strings = find_matching_domains(td_texts, domain)
     urls = prepare_urls(printed_strings)
-
-    # Asynchronously check status codes
-    status_codes = asyncio.run(check_status_codes(urls))
+    status_codes = check_status_codes(urls)
     print_sorted_status_codes(status_codes)
 
 if __name__ == "__main__":
