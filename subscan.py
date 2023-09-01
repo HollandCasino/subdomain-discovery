@@ -1,6 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 import httpx
+import asyncio
+import time
 
 def fetch_html_content(url):
     response = requests.get(url)
@@ -21,18 +23,23 @@ def prepare_urls(printed_strings):
         urls.add("https://" + x)
     return urls
 
-def sc_check(urls):
+async def sc_check(urls):
+
     check_urls = list(urls)
-    
+    start_time = time.time()
+
     for x in check_urls:
         try:
-            check = httpx.get(x)
-            print(f"{x}: {check.status_code}") 
+            async with httpx.AsyncClient(verify=True, timeout=5.0) as client:
+                check = await client.get(x)
+                print(f"{x}: {check.status_code}") 
+                
         except httpx.RequestError as e:
             print(f"{x}: Error - {e}")
 
-    return x, check.status_code
+    print("\n", "Process finished --- %s seconds ---" % (time.time() - start_time))
 
+    return x, check.status_code
 
 def main():
     
@@ -45,7 +52,8 @@ def main():
         td_texts = [td.get_text() for td in soup.find_all("td")]
         printed_strings = find_matching_domains(td_texts, domain)
         urls = prepare_urls(printed_strings)
-        sc_check(urls)
+        asyncio.run(sc_check(urls))
+
     except requests.RequestException as e:
         print("Error fetching or parsing data:", e)
     except KeyboardInterrupt:
